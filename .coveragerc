@@ -1,0 +1,11 @@
+[run]
+branch = True
+include =
+    fedora_notifications/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+omit =
+    fedora_notifications/tests/*

@@ -1,0 +1,10 @@
+include LICENSE
+include README.rst
+include config.toml.example
+include dev-requirements.txt
+include requirements.txt
+include tox.ini
+include alembic.ini
+include delivery_service.tac
+graft docs
+graft fedora_notifications/tests/fixtures

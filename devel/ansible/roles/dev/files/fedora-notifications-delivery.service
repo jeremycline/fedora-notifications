@@ -1,0 +1,13 @@
+[Unit]
+Description=The Fedora Notifications delivery service
+After=network.target
+Documentation=https://github.com/fedora-infra/fedora-notifications/
+
+[Service]
+Environment=FEDORA_NOTIFICATIONS_CONF=/home/vagrant/config.toml
+ExecStart=/home/vagrant/.virtualenvs/fn/bin/twistd -n -l - -y %h/fedora-notifications/delivery_service.tac
+Type=simple
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,17 @@
+---
+- name: Install system dependencies
+  package: name={{ item }} state=present
+  with_items:
+    - python2-pyOpenSSL
+    - ngircd
+
+- name: Install ngircd config
+  copy:
+    src: ngircd.conf
+    dest: /etc/
+
+- name: Enable ngircd service
+  service:
+    name: ngircd
+    state: started
+    enabled: yes

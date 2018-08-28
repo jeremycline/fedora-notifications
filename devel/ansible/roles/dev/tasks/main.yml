@@ -1,0 +1,127 @@
+---
+
+- import_tasks: db.yml
+- import_tasks: rabbitmq.yml
+- import_tasks: irc.yml
+
+- name: Install helpful development packages
+  dnf: name={{ item }} state=present
+  with_items:
+    - git
+    - python-virtualenvwrapper
+    - vim-enhanced
+
+- name: Install system dependencies
+  dnf: name={{ item }} state=present
+  with_items:
+    - gcc
+    - make
+    - libffi-devel
+    - openssl-devel
+    - postgresql-devel
+    - postfix
+    - python3-devel
+
+# Add various helpful configuration files
+- name: Install a custom bashrc
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  copy: src=bashrc dest=/home/{{ ansible_env.SUDO_USER }}/.bashrc
+
+- name: Install the message of the day
+  copy: src=motd dest=/etc/motd
+
+- name: Install application configuration
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  copy: src=config.toml dest=/home/{{ ansible_env.SUDO_USER }}/config.toml
+
+- name: Create virtualenv
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  shell: >
+      source ~/.bashrc && mkvirtualenv --python=python3 fn -a ~/fedora-notifications/
+  args:
+    creates: /home/{{ ansible_env.SUDO_USER }}/.virtualenvs/fn
+
+- name: Install requirements into the virtualenv
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  pip:
+    requirements: "/home/vagrant/fedora-notifications/requirements.txt"
+    virtualenv: /home/{{ ansible_env.SUDO_USER }}/.virtualenvs/fn/
+    virtualenv_python: python3
+
+- name: Install PostgreSQL driver in the virtualenv
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  pip:
+    name: "psycopg2"
+    virtualenv: /home/{{ ansible_env.SUDO_USER }}/.virtualenvs/fn/
+    virtualenv_python: python3
+
+- name: Install development requirements into the virtualenv
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  pip:
+    requirements: "/home/vagrant/fedora-notifications/dev-requirements.txt"
+    virtualenv: /home/{{ ansible_env.SUDO_USER }}/.virtualenvs/fn/
+    virtualenv_python: python3
+
+- name: Install Tox
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  pip: name=tox virtualenv=/home/{{ ansible_env.SUDO_USER }}/.virtualenvs/fn/
+
+- name: Install fedora-notifications into the virtualenv
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  pip:
+    name: "/home/{{ ansible_env.SUDO_USER }}/fedora-notifications"
+    extra_args: "-e"
+    virtualenv: /home/{{ ansible_env.SUDO_USER }}/.virtualenvs/fn/
+    virtualenv_python: python3
+
+- name: Create database schema
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  shell: >
+      source ~/.virtualenvs/fn/bin/activate &&
+      fedora-notifications createdb --alembic-ini=alembic.ini &&
+      touch ~/.schema-created
+  args:
+    creates: /home/vagrant/.schema-created
+    chdir: /home/vagrant/fedora-notifications
+  environment:
+    FEDORA_NOTIFICATIONS_CONF: /home/vagrant/config.toml
+
+- name: Register with Fedora's OIDC server
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  command: >
+    ~/.virtualenvs/fn/bin/oidc-register \
+    --output-file=/home/{{ ansible_env.SUDO_USER }}/client_secrets.json \
+    https://iddev.fedorainfracloud.org/ http://localhost:5000
+  args:
+    creates: /home/{{ ansible_env.SUDO_USER }}/client_secrets.json
+
+- name: Create user systemd directory
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  file:
+    path: /home/{{ ansible_env.SUDO_USER }}/.config/systemd/user/
+    state: directory
+
+- name: Install the flask systemd service file
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  copy:
+    src: flask.service
+    dest: /home/{{ ansible_env.SUDO_USER }}/.config/systemd/user/
+
+- name: Install the delivery service systemd service file
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  copy:
+    src: fedora-notifications-delivery.service
+    dest: /home/{{ ansible_env.SUDO_USER }}/.config/systemd/user/
+
+- name: Reload the systemd daemon
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  command: systemctl --user daemon-reload
+
+- name: Start the Flask development server
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  command: systemctl --user enable --now flask.service
+
+- name: Start the Flask development server
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  command: systemctl --user enable --now fedora-notifications-delivery.service
+

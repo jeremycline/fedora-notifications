@@ -1,0 +1,8 @@
+click
+# Currently using features from after 1.0.0b1
+git+https://github.com/fedora-infra/fedora-messaging.git  # fedora_messaging
+flask
+Flask-OIDC
+pytoml
+twisted
+sqlalchemy

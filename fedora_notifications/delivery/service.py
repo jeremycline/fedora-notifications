@@ -14,9 +14,11 @@ from twisted.application import service, internet
 from twisted.logger import Logger
 
 from fedora_messaging.twisted.service import FedoraMessagingService
+from fedora_messaging.twisted.factory import FedoraMessagingFactory
+import pika
 
 from . import irc, mail
-from .. import config, db
+from .. import config, db, messages
 
 _log = Logger()
 
@@ -44,53 +46,74 @@ class DeliveryService(service.MultiService):
 
     name = "FedoraNotificationService"
 
+    def get_queues(self, delivery_type):
+        queues = db.Queue.query.filter_by(
+            delivery_type=delivery_type, batch=None
+        ).all()
+        bindings = []
+        for q in queues:
+            bindings += q.bindings()
+        db.Session.remove()
+
+        return [q.arguments() for q in queues], bindings
+
     def __init__(self):
         service.MultiService.__init__(self)
         self.email_producer = None
         self.irc_producer = None
         self.irc_client = None
 
-        # Although this is a blocking call, no work can happen until it's done and it's
-        # a one-time call at startup.
+        # Map queue names to service instances
+        self._queues = {}
+        self._irc_queues = {}
+        self._email_queues = {}
+        self._irc_services = []
+        self._email_services = []
+
         db.initialize(config.conf)
 
-        irc_bindings = []
         if config.conf["IRC_ENABLED"]:
-            irc_queues = db.Queue.query.filter_by(
-                delivery_type=db.DeliveryType.irc, batch=None
-            ).all()
-            for q in irc_queues:
-                irc_bindings += q.bindings()
-            _log.info("Setting up and binding to {n} queues for IRC", n=len(irc_bindings))
+            queues, bindings = self.get_queues(db.DeliveryType.irc)
+            consumers = {q["queue"]: self._dispatch_irc for q in queues}
+            producer = FedoraMessagingService(
+                queues=queues, bindings=bindings, consumers=consumers)
+            producer.setName("irc-{}".format(len(self._irc_services)))
+            self._irc_services.append(producer)
+            for queue in queues:
+                self._queues[queue["queue"]] = producer
+            self.addService(producer)
 
-        email_bindings = []
         if config.conf["EMAIL_ENABLED"]:
-            email_queues = db.Queue.query.filter_by(
-                delivery_type=db.DeliveryType.email, batch=None
-            ).all()
-            for q in email_queues:
-                email_bindings += q.bindings()
-            _log.info("Setting up and binding to {n} queues for email", n=len(email_bindings))
+            queues, bindings = self.get_queues(db.DeliveryType.email)
+            consumers = {q["queue"]: mail.deliver for q in queues}
+            producer = FedoraMessagingService(
+                queues=queues, bindings=bindings, consumers=consumers)
+            producer.setName("email-{}".format(len(self._email_services)))
+            self._email_services.append(producer)
+            for queue in queues:
+                self._queues[queue["queue"]] = producer
+            self.addService(producer)
 
-        db.Session.remove()
-
+        amqp_endpoint = endpoints.clientFromString(
+            reactor, 'tcp:localhost:5672'
+        )
+        params = pika.URLParameters('amqp://')
+        control_queue = {
+            "queue": "fedora-notifications-control-queue",
+            "durable": True,
+        }
+        factory = FedoraMessagingFactory(
+            params,
+            queues=[control_queue],
+        )
+        factory.consume(self._manage_service, control_queue["queue"])
+        self.amqp_service = internet.ClientService(amqp_endpoint, factory)
+        self.addService(self.amqp_service)
         # TODO set up a listener for messages about new queues.
         # Then we need an API to poke a message service to start a new subscription
         # or stop an existing one.
-        if irc_bindings:
-            self.irc_producer = FedoraMessagingService(
-                self._dispatch_irc, bindings=irc_bindings
-            )
-            self.irc_producer.setName("irc-fedora-messaging")
-            self.addService(self.irc_producer)
-        if email_bindings:
-            self.email_producer = FedoraMessagingService(
-                mail.deliver, bindings=email_bindings
-            )
-            self.email_producer.setName("email-fedora-messaging")
-            self.addService(self.email_producer)
 
-        if self.irc_producer:
+        if self._irc_services:
             irc_endpoint = endpoints.clientFromString(
                 reactor, config.conf["IRC_ENDPOINT"]
             )
@@ -104,17 +127,40 @@ class DeliveryService(service.MultiService):
         client = yield self.irc_client.whenConnected()
         yield client.deliver(message)
 
+    def _manage_service(self, message):
+        _log.info("{q}", q=str(message))
+        if isinstance(message, messages.QueueCreated):
+            queue_type = message.queue_name.split('.', 1)[0]
+            if queue_type == "irc":
+                producer = self._irc_services[0]
+                producer.getFactory().consume(self._dispatch_irc, message.queue_name)
+                self._queues[message.queue_name] = producer
+            elif queue_type == "email":
+                producer = self._email_services[0]
+                producer.getFactory().consume(mail.deliver, message.queue_name)
+                self._queues[message.queue_name] = producer
+        elif isinstance(message, messages.QueueDeleted):
+            queue_type = message.queue_name.split('.', 1)[0]
+            if queue_type == "irc":
+                producer = self._irc_services[0]
+                producer.getFactory().cancel(message.queue_name)
+                del self._queues[message.queue_name]
+            elif queue_type == "email":
+                producer = self._email_services[0]
+                producer.getFactory().cancel(message.queue_name)
+                del self._queues[message.queue_name]
+
     def startService(self):
         """Called by Twisted to start the service."""
+        self.amqp_service.startService()
         if self.irc_client:
             self.irc_client.startService()
-        if self.irc_producer:
-            self.irc_producer.startService()
-        if self.email_producer:
-            self.email_producer.startService()
+        for serv in self._irc_services + self._email_services:
+            serv.startService()
 
     def stopService(self):
         """Called by Twisted to stop the service."""
+        self.amqp_service.stopService()
         if self.irc_client:
             self.irc_client.stopService()
         if self.irc_producer:

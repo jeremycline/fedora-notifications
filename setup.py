@@ -82,6 +82,10 @@ setup(
     tests_require=get_requirements(requirements_file="dev-requirements.txt"),
     test_suite="fedora_notifications.tests",
     entry_points={
-        "console_scripts": ["fedora-notifications=fedora_notifications.cli:cli"]
+        "console_scripts": ["fedora-notifications=fedora_notifications.cli:cli"],
+        "fedora.messages": [
+            "fn_queue_deleted=fedora_notifications.messages:QueueDeleted",
+            "fn_queue_created=fedora_notifications.messages:QueueCreated",
+        ],
     },
 )

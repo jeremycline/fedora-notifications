@@ -4,6 +4,7 @@
 """Functions related to building the Flask application."""
 
 import flask
+import flask_restful
 import sqlalchemy
 
 from . import db, config, __version__
@@ -37,7 +38,8 @@ def create(config_obj=None):
     app.teardown_request(post_request_database)
     app.context_processor(include_template_variables)
 
-    app.register_blueprint(api.api_blueprint, url_prefix="/api/v1")
+    app.api = flask_restful.Api(app)
+    app.api.add_resource(api.QueueResource, "/api/v1/queues/")
     app.register_blueprint(ui.ui_blueprint)
     return app
 

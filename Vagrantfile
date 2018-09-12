@@ -6,9 +6,11 @@ VAGRANTFILE_API_VERSION = "2"
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
  config.vm.box = "fedora/28-cloud-base"
 
- # Forward traffic on the host to the development server on the guest
+ # Forward traffic on the host to the Flask development server on the guest
  config.vm.network "forwarded_port", guest: 5000, host: 5000
+ # Forward traffic on the host to the IRC server on the guest
  config.vm.network "forwarded_port", guest: 6667, host: 6667
+ # Forward traffic on the host to the RabbitMQ management UI on the guest
  config.vm.network "forwarded_port", guest: 15672, host: 15672
 
  if Vagrant.has_plugin?("vagrant-hostmanager")

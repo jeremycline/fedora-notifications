@@ -21,7 +21,7 @@ def deliver(message):
         email_address (str): The recipient's email address.
         message (str): The formatted message, ready for dispatching.
     """
-    email_address = message._queue.split('.', 1)[1]
+    email_address = message.queue.split('.', 1)[1]
     try:
         # TODO handle the mail server being down gracefully
         yield smtp.sendmail(

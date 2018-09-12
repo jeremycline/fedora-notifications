@@ -5,6 +5,7 @@
 import logging
 
 from twisted.words.protocols import irc
+from twisted.internet import defer
 
 from .. import config
 
@@ -29,6 +30,7 @@ class IrcProtocol(irc.IRCClient):
         self.realname = "Fedora Notification Service"
         self.nickname = config.conf["IRC_NICK"]
         self.commands = {}
+        self.authentication_done = defer.Deferred()
 
     def signedOn(self):
         """
@@ -45,6 +47,8 @@ class IrcProtocol(irc.IRCClient):
                     nick=config.conf["IRC_NICK"], password=config.conf["IRC_PASSWORD"]
                 ),
             )
+        else:
+            self.authentication_done.callback(None)
 
     def deliver(self, message):
         """
@@ -54,7 +58,7 @@ class IrcProtocol(irc.IRCClient):
             identity (str): The user or channel to send the message to.
             message (str): The formatted message ready for delivery.
         """
-        user = message._queue.split('.', 1)[1]
+        user = message.queue.split('.', 1)[1]
         return self.msg(user, message.summary)
 
     def privmsg(self, user, channel, msg):

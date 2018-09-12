@@ -8,11 +8,12 @@ import logging.config
 
 from twisted.application import service
 
-from fedora_notifications import config
+from fedora_notifications import config, db
 from fedora_notifications.delivery.service import DeliveryService
 
 
 logging.config.dictConfig(config.conf['LOG_CONFIG'])
+db.initialize(config.conf)
 
 # Configure the twisted application itself.
 application = service.Application('Fedora Notification Delivery Service')

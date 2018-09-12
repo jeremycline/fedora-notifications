@@ -21,5 +21,5 @@ source /usr/bin/virtualenvwrapper.sh
 
 export FEDORA_NOTIFICATIONS_CONF=~/config.toml
 
-alias resetdb="sudo -l -U postgres dropdb fedora_notification && sudo -l -U postgres createdb fedora_notification && workon fn && fedora-notifications createdb --alembic-ini alembic-ini"
+alias dbreset="sudo -l -U postgres dropdb fedora_notification && sudo -l -U postgres createdb fedora_notification && workon fn && fedora-notifications createdb --alembic-ini alembic-ini"
 alias dbshell="workon fn && python -i -c \"from fedora_notifications import db; db.initialize()\""

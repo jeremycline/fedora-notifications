@@ -87,7 +87,12 @@ class Queue(Base):
 
     def bindings(self):
         """
-        Return a list of bindings associated with this queue.
+        A list of bindings associated with this queue.
+
+        Returns:
+            list of dict: A list of dictionaries, each dictionary representing a
+                binding AMQP object and suitable to be passed to fedora-messaging's
+                Twisted service.
         """
         header_bindings = []
         for header in self.header_bindings:
@@ -96,14 +101,28 @@ class Queue(Base):
         return header_bindings + topic_bindings
 
     def arguments(self):
+        """
+        Arguments to create the AMQP queue.
+
+        Returns:
+            dict: A dictionary of queue creation arguments, suitable to passed to
+                fedora-messaging's Twisted service.
+        """
         queue_args = {}
         if config.conf["QUEUE_EXPIRES"]:
-            queue_args["x-expires"] = config.conf["QUEUE_EXPIRES"]
+            queue_args["x-expires"] = config.conf["QUEUE_EXPIRES"] * 1000
         if config.conf["QUEUE_MAX_LENGTH"]:
             queue_args["x-max-length"] = config.conf["QUEUE_MAX_LENGTH"]
         if config.conf["QUEUE_MAX_SIZE"]:
             queue_args["x-max-length-bytes"] = config.conf["QUEUE_MAX_SIZE"]
-        return queue_args
+        return {
+            "queue": self.name,
+            "durable": True,
+            "passive": False,
+            "exclusive": False,
+            "auto_delete": False,
+            "arguments": queue_args,
+        }
 
 
 class TopicBinding(Base):
@@ -123,13 +142,10 @@ class TopicBinding(Base):
     def binding(self):
         """Produce a dictionary for the fedora-messaging library."""
         return {
+            "queue": self.queue.name,
             "exchange": "amq.topic",
-            "exchange_type": "topic",
             "routing_key": self.topic,
-            "queue_name": self.queue.name,
-            "queue_auto_delete": False,
-            "queue_arguments": self.queue.arguments(),
-            "binding_arguments": {},
+            "arguments": {},
         }
 
 
@@ -223,13 +239,10 @@ class HeaderBinding(Base):
             if sev >= self.severity:
                 binds.append(
                     {
+                        "queue": self.queue.name,
                         "exchange": "amq.match",
-                        "exchange_type": "headers",
                         "routing_key": None,
-                        "queue_name": self.queue.name,
-                        "queue_auto_delete": False,
-                        "queue_arguments": self.queue.arguments(),
-                        "binding_arguments": {
+                        "arguments": {
                             "x-match": "all",
                             self.key_name: True,
                             "fedora_messaging_severity": sev,

@@ -1,4 +1,3 @@
-
 Welcome to the fedora-notifications development environment!
 
 Here are some tips:
@@ -8,12 +7,21 @@ Here are some tips:
 * Start and stop the Flask development server with
   `systemctl --user {action} flask.service`
 
-* All logs are viewable through `journalctl --user-unit flask.service`
+* Start and stop the delivery service with
+  `systemctl --user {action} fedora-notifications-delivery.service`
+
+* All logs are viewable through `journalctl`
 
 * You can type `workon fn` to enter a configured Python virtualenv
 
 Once you start the development server, you can navigate to http://localhost:5000/
 in your host's browser.
 
-Happy hacking!
+The RabbitMQ broker management interface is enabled and available at
+http://localhost:15672/.
 
+Finally, there is an IRC server listening on port 6667 which you can connect to
+and receive test notifications on and a Postfix server which delivers all mail
+to /var/spool/mail/vagrant.
+
+Happy hacking!

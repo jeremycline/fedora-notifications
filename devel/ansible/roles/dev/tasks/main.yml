@@ -3,6 +3,7 @@
 - import_tasks: db.yml
 - import_tasks: rabbitmq.yml
 - import_tasks: irc.yml
+- import_tasks: postfix.yml
 
 - name: Install helpful development packages
   dnf: name={{ item }} state=present
@@ -19,7 +20,6 @@
     - libffi-devel
     - openssl-devel
     - postgresql-devel
-    - postfix
     - python3-devel
 
 # Add various helpful configuration files
@@ -113,15 +113,20 @@
     src: fedora-notifications-delivery.service
     dest: /home/{{ ansible_env.SUDO_USER }}/.config/systemd/user/
 
-- name: Reload the systemd daemon
-  become_user: "{{ ansible_env.SUDO_USER }}"
-  command: systemctl --user daemon-reload
-
 - name: Start the Flask development server
   become_user: "{{ ansible_env.SUDO_USER }}"
-  command: systemctl --user enable --now flask.service
+  systemd:
+    name: flask.service
+    state: started
+    enabled: yes
+    user: yes
+    daemon_reload: yes
 
-- name: Start the Flask development server
+- name: Start the Fedora Notifications delivery service
   become_user: "{{ ansible_env.SUDO_USER }}"
-  command: systemctl --user enable --now fedora-notifications-delivery.service
-
+  systemd:
+    name: fedora-notifications-delivery.service
+    state: started
+    enabled: yes
+    user: yes
+    daemon_reload: yes

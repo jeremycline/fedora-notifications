@@ -3,6 +3,7 @@ click
 git+https://github.com/fedora-infra/fedora-messaging.git  # fedora_messaging
 flask
 Flask-OIDC
+flask_restful
 pytoml
 twisted
 sqlalchemy

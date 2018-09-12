@@ -1,13 +1,47 @@
 ---
-- name: Install database packages
+- name: Install RabbitMQ packages
   package:
       name: "{{ item }}"
       state: present
   with_items:
       - rabbitmq-server
 
-- name: enable plugins
-  copy: src=rabbitmq_plugins dest=/etc/rabbitmq/enabled_plugins owner=root group=root mode=0644
+- name: Create RabbitMQ systemd override directory
+  file:
+    path: /etc/systemd/system/rabbitmq-server.service.d/
+    state: directory
+
+- name: Override file limit on rabbitmq
+  copy:
+    content: "[Service]\nLimitNOFILE={{rabbitmq_cluster_file_limit}}\n"
+    dest: /etc/systemd/system/rabbitmq-server.service.d/override.conf
+  notify:
+    - reload rabbitmq
+
+- name: Enables the rabbitmq management and SSL authentication plugins
+  rabbitmq_plugin:
+    names: rabbitmq_management,rabbitmq_auth_mechanism_ssl
 
 - name: start rabbitmq
   service: name=rabbitmq-server state=started enabled=yes
+
+- name: Create fedora-notifications vhost
+  rabbitmq_vhost:
+    name: /fedora-notifications
+    state: present
+
+- name: Create a guest user in RabbitMQ
+  rabbitmq_user:
+    user: guest
+    password: guest
+    tags: administrator
+    permissions:
+      - vhost: /fedora-notifications
+        configure_priv: .*
+        read_priv: .*
+        write_priv: .*
+      - vhost: /
+        configure_priv: .*
+        read_priv: .*
+        write_priv: .*
+    state: present

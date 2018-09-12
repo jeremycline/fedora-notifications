@@ -13,10 +13,21 @@ documentation at :mod:`fedora_messaging.config`.
 
 Each configuration option has a default value.
 
-Queue Options
-=============
 
-These options are applied to queues created for user messages.
+General Configuration
+=====================
+
+log_config
+----------
+A dictionary describing the logging configuration to use, in a format accepted
+by :func:`logging.config.dictConfig`.
+
+consumers_per_connection
+------------------------
+
+The number of consumers per connection to the broker. Each consumer uses a
+channel, and each connection typically has a channel limit. Set this well below
+the channel limit. Defaults to 1000.
 
 .. _conf-queue-expires:
 
@@ -159,11 +170,6 @@ A Boolean indicating whether or not TLS is required for the SMTP server.
 The default is ``False``.
 
 .. _conf-log-config:
-
-log_config
-----------
-A dictionary describing the logging configuration to use, in a format accepted
-by :func:`logging.config.dictConfig`.
 """
 import logging
 import logging.config
@@ -181,7 +187,7 @@ DEFAULTS = {
     "SECRET_KEY": "change me",
     "SQL_DEBUG": False,
     "DATABASE_URL": "sqlite:////",
-    "QUEUE_EXPIRES": 60 * 60 * 24 * 31,
+    "QUEUE_EXPIRES": 60 * 5,
     "QUEUE_MAX_LENGTH": None,
     "QUEUE_MAX_SIZE": None,
     "IRC_ENABLED": True,
@@ -196,6 +202,7 @@ DEFAULTS = {
     "SMTP_PASSWORD": None,
     "SMTP_REQUIRE_AUTHENTICATION": False,
     "SMTP_REQUIRE_TLS": False,
+    "CONSUMERS_PER_CONNECTION": 1000,
     "LOG_CONFIG": {
         "version": 1,
         "disable_existing_loggers": False,
@@ -215,6 +222,11 @@ DEFAULTS = {
             },
             "fedora_notifications": {
                 "level": "INFO",
+                "propagate": False,
+                "handlers": ["console"],
+            },
+            "pika": {
+                "level": "WARNING",
                 "propagate": False,
                 "handlers": ["console"],
             },

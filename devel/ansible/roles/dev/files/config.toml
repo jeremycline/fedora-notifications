@@ -1,0 +1,35 @@
+# This is a TOML-format file. For the spec, see https://github.com/toml-lang/toml#spec
+
+# URL to the database
+database_url = "postgresql://postgres:password@localhost/fedora_notifications"
+
+irc_endpoint = "tcp:localhost:6667"
+irc_nick = "fn-bot"
+
+# Allow the cookie over HTTP
+# ONLY SET THIS IN DEVELOPMENT ON LOCALHOST
+OIDC_ID_TOKEN_COOKIE_SECURE = false
+OIDC_CLIENT_SECRETS = "/home/vagrant/client_secrets.json"
+
+
+# The logging configuration, in dictConfig format.
+[log_config]
+version = 1
+disable_existing_loggers = false
+
+[log_config.formatters.simple]
+format = "[%(name)s %(levelname)s] %(message)s"
+
+[log_config.handlers.console]
+class = "logging.StreamHandler"
+formatter = "simple"
+stream = "ext://sys.stdout"
+
+[log_config.loggers.fedora_notifications]
+level = "INFO"
+propagate = false
+handlers = ["console"]
+
+[log_config.root]
+level = "INFO"
+handlers = ["console"]
